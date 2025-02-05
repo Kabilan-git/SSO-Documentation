@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <link href="src/output.css" rel="stylesheet" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    />
+  </head>
+  <body>
+    <div class="container-fluid p-0">
+      <!-- As a heading -->
+      <nav class="navbar bg-body-tertiary">
+        <div class="container-fluid">
+          <span class="navbar-brand mb-0 h1">SSO Azure AD</span>
+        </div>
+      </nav>
+
+      <div class="container-fluid">
+        <h4 class="my-4">
+          Install the below packages using NuGet Package Manager:
+        </h4>
+        <ul>
+          <li>Microsoft.Owin.Host.SystemWeb</li>
+          <li>Microsoft.Owin.Security.OpenIdConnect</li>
+          <li>Microsoft.Owin.Security.Cookies</li>
+        </ul>
+
+        <h4 class="my-4">Add below codes in Global.asax file</h4>
+        <div class="card">
+          <div class="card-body">
+            <code><pre>
+              using System;
+              using System.Collections.Generic;
+              using System.Configuration;
+              using System.Net;
+              using System.Web;
+              using Microsoft.Owin;
+              using Microsoft.Owin.Host.SystemWeb;
+              using Microsoft.Owin.Security;
+              using Microsoft.Owin.Security.Cookies;
+              using Microsoft.Owin.Security.OpenIdConnect;
+              using Owin;
+              
+              [assembly: OwinStartup(typeof(CostSheetReviewWeb.Global))] // Ensures OWIN Startup
+              namespace CostSheetReviewWeb
+              {
+                public class Global : HttpApplication
+                {
+                  private static string clientId = ConfigurationManager.AppSettings["ida:ClientId"];
+                  private static string aadInstance = EnsureTrailingSlash(ConfigurationManager.AppSettings["ida:AADInstance"]);
+                  private static string tenantId = ConfigurationManager.AppSettings["ida:TenantId"];
+                  private static string postLogoutRedirectUri = ConfigurationManager.AppSettings["ida:PostLogoutRedirectUri"];
+              
+                  string authority = aadInstance + tenantId;
+              
+                  protected void Application_Start(object sender, EventArgs e)
+                  {
+                    // Manually initialize OWIN middleware
+                    Configuration(new AppBuilder());
+                  }
+              
+                  public void Configuration(IAppBuilder app)
+                  {
+                    ServicePointManager.SecurityProtocol = (SecurityProtocolType)4080;
+                    app.SetDefaultSignInAsAuthenticationType(CookieAuthenticationDefaults.AuthenticationType);
+              
+                    app.UseCookieAuthentication(new CookieAuthenticationOptions
+                    {
+                      CookieManager = new SystemWebCookieManager()
+                    });
+              
+                    app.UseOpenIdConnectAuthentication(
+                      new OpenIdConnectAuthenticationOptions
+                      {
+                        ClientId = clientId,
+                        Authority = authority,
+                        AuthenticationMode = AuthenticationMode.Active,
+                      });
+                  }
+                  private static string EnsureTrailingSlash(string value)
+                  {
+                    if (value == null)
+                    {
+                      value = string.Empty;
+                    }
+              
+                    if (!value.EndsWith("/", StringComparison.Ordinal))
+                    {
+                      return value + "/";
+                    }
+              
+                    return value;
+                  }
+                }
+              
+                // Helper class to initialize OWIN manually
+                public class AppBuilder : IAppBuilder
+                {
+                  public object Build(Type returnType) => null;
+                  public IAppBuilder New() => new AppBuilder();
+                  public IDictionary<string, object> Properties => new Dictionary<string, object>();
+                  public IAppBuilder Use(object middleware, params object[] args) => this;
+                }
+              }
+              </pre></code>
+          </div>
+        </div>
+        <h1>Navigate to Application starting page, For mine its <span class="bg-warning"> Default.aspx</span></h1>
+        <h4>In Load_Page function add the below code</h4>
+        <div class="card">
+          <div class="card-body">
+            <code><pre>
+              protected void Page_Load(object sender, EventArgs e)
+                {
+                  if (!Request.IsAuthenticated)
+                  {
+                    HttpContext.Current.GetOwinContext().Authentication.Challenge(
+                    new AuthenticationProperties { RedirectUri = "/" },
+                    OpenIdConnectAuthenticationDefaults.AuthenticationType);
+                  }
+                }</pre></code>
+          </div>
+        </div>
+<h4>If any another functions called in Load_Page, use it like this</h4>
+<div class="card">
+  <div class="card-body">
+    <code><pre>
+      protected void Page_Load(object sender, EventArgs e)
+      {
+        if (!Request.IsAuthenticated)
+        {
+          HttpContext.Current.GetOwinContext().Authentication.Challenge(
+          new AuthenticationProperties { RedirectUri = "/" },
+          OpenIdConnectAuthenticationDefaults.AuthenticationType);
+        }
+        else
+        {
+          if (!IsPostBack)
+          {
+            LaodDataTable();
+          }
+        }
+      }
+      </pre></code>
+  </div>
+</div>
+
+<h1>Replace the below code BI.Master.cs</h1>
+<h4>Page_Init</h4>
+
+<div class="card">
+  <div class="card-body">
+    <code><pre>protected void Page_Init(object sender, EventArgs e)
+      {
+        try
+        {
+          var path = Path.GetFileName(Request.PhysicalPath);
+          bool IsAuthenticated = false;
+          string mail = string.Empty, userName = string.Empty;
+          if (HttpContext.Current.User.Identity.IsAuthenticated)
+          {
+            mail = HttpContext.Current.User.Identity.Name;
+            var claimsPrincipal = HttpContext.Current.User as ClaimsPrincipal;
+            var surname = claimsPrincipal.FindFirst(ClaimTypes.Surname)?.Value;
+            var givenName = claimsPrincipal.FindFirst(ClaimTypes.GivenName)?.Value;	
+            userName = $"{surname} {givenName}";
+            Session["UserID"] = mail.Split('@')[0];//"69904";//12186";//"68205";//12186;//51075;
+            Session["UserName"] = userName;//"Meganathan K";
+            Session["LoginName"] = userName;//"Meganathan K";
+            IsAuthenticated = true;
+          }
+          if (HttpContext.Current.User.Identity.IsAuthenticated)
+            IsAuthenticated = true;
+          else if (Session["UserID"] == null || Session["UserName"] == null || Session["LoginName"] == null) // Validating Session Values
+            IsAuthenticated = false;
+      
+          if (!IsAuthenticated)
+          {
+            int number;
+            string userid = mail.Split('@')[0];
+            bool success = Int32.TryParse(userid, out number);
+            string LoggedInUser = string.Empty;
+            if (success)
+            {
+              LoggedInUser = userid;
+            }
+            else
+            {
+              BICommon objBICommon = new BICommon();
+              DataSet _dsGetSpecialEmployeeByUserid = objBICommon.SelectSpecialEmployeeNoByUserId(userid);
+              if (_dsGetSpecialEmployeeByUserid.Tables[0].Rows.Count > 0)
+              {
+                LoggedInUser = _dsGetSpecialEmployeeByUserid.Tables[0].Rows[0]["EmpNo"].ToString();
+              }
+              else
+              {
+                string email = mail;
+                DataSet dsSpecialEmployeeNo = objBICommon.SelectSpecialEmployeeNo(email);
+                if (email != "" && email != null)
+                {
+                  if (dsSpecialEmployeeNo.Tables.Count > 0)
+                  {
+                    if (dsSpecialEmployeeNo.Tables[0].Rows.Count > 0)
+                    {
+                      LoggedInUser = dsSpecialEmployeeNo.Tables[0].Rows[0]["pernr"].ToString();
+                    }
+                  }
+                }
+              }
+            }
+      
+            if (!LoggedInUser.Equals(string.Empty))
+            {
+              Session["UserID"] = LoggedInUser;
+              Session["UserName"] = userName; 
+              Session["LoginName"] = userName; 
+              // Creating User Details For Cookie Store
+              string UserDetails = string.Format("{0}|{1}|{2}", objAuthorization.UserID, userName, mail);
+              // Create the cookie that contains the forms authentication ticket
+              HttpCookie authCookie = FormsAuthentication.GetAuthCookie(objAuthorization.UserID, false);
+              // Get the FormsAuthenticationTicket out of the encrypted cookie
+              FormsAuthenticationTicket ticket = FormsAuthentication.Decrypt(authCookie.Value);
+              // Create a new FormsAuthenticationTicket that includes our custom User Data
+              FormsAuthenticationTicket newTicket = new FormsAuthenticationTicket(ticket.Version, ticket.Name, ticket.IssueDate, ticket.Expiration, ticket.IsPersistent, UserDetails);
+              // Update the authCookie's Value to use the encrypted version of newTicket
+              authCookie.Value = FormsAuthentication.Encrypt(newTicket);
+              // Manually add the authCookie to the Cookies collection
+              Response.Cookies.Add(authCookie);
+      
+              objAuthorization.SessionID = Session.SessionID;
+              // Logged In User ID
+              objAuthorization.UserID = Session["UserID"].ToString();
+              // Current Page Name
+              objAuthorization.PageName = Path.GetFileName(Request.PhysicalPath);
+              // Application ID
+              objAuthorization.ApplicationID = ApplicationName;
+              // Remote Host ID
+              objAuthorization.RemoteHost = Request.UserHostAddress;
+              // Client Browser Version
+              objAuthorization.Browser = Request.Browser.Id + " - " + Request.Browser.Version;
+              // Client Operating System
+              objAuthorization.PlatForm = Request.Browser.Platform;
+              if (!path.Equals("Default.aspx") && !path.Equals("Notifications.aspx") && !path.Equals("CheckAuthenticate.aspx") && !objAuthorization.ValidateFunctionalityAuthorizationForUser())
+                Response.Redirect("~/Error.aspx", false);
+              else
+                objAuthorization.LogUserDetailsInDB();
+            }
+            else
+            {
+                Response.Redirect("~/Error.aspx", false);
+            }
+            //else
+            //{
+            //	// Development debug mode commented this while go to live it will be uncomment
+            //	//Response.Redirect("~/Error.aspx", false);
+            //}
+          }
+          else
+          {
+            objAuthorization.SessionID = Session.SessionID;
+            // Logged In User ID
+            objAuthorization.UserID = Session["UserID"].ToString();
+            // Current Page Name
+            objAuthorization.PageName = Path.GetFileName(Request.PhysicalPath);
+            // Application ID
+            objAuthorization.ApplicationID = ApplicationName;
+            // Remote Host ID
+            objAuthorization.RemoteHost = Request.UserHostAddress;
+            // Client Browser Version
+            objAuthorization.Browser = Request.Browser.Id + " - " + Request.Browser.Version;
+            // Client Operating System
+            objAuthorization.PlatForm = Request.Browser.Platform;
+            if (!path.Equals("Default.aspx") && !path.Equals("Notifications.aspx") && !path.Equals("CheckAuthenticate.aspx") && !objAuthorization.ValidateFunctionalityAuthorizationForUser())
+              Response.Redirect("~/Error.aspx", false);
+            else
+              objAuthorization.LogUserDetailsInDB();
+          }
+        }
+        catch (Exception ex)
+        {
+          throw ex;
+        }
+      }</pre></code>
+  </div>
+</div>
+<h4>Page_Load</h4>
+<div class="card">
+  <div class="card-body">
+    <h4>Add the below line in starting of the method</h4>
+    <code><pre>if (Request.IsAuthenticated)
+      </pre></code>
+      <h5>For example:</h5>
+      <code><pre>protected void Page_Load(object sender, EventArgs e)
+        {
+          try
+          {
+            if (Request.IsAuthenticated)
+            {
+              rnMessage.VisibleOnPageLoad = false;
+        
+              if (Session["OriginalUserID"] != null)
+              {
+                divImp.Visible = true;
+                ImpText.InnerHtml = "You are impersonating user " + Session["UserID"].ToString() + ".";
+              }
+              else
+              {
+                divImp.Visible = false;
+              }
+        
+              if (!IsPostBack)
+              {
+                lblUserName.Text = Session["LoginName"] == null ? string.Empty : Session["LoginName"].ToString();
+                imgUser.Src = GetUserAvatarURL(UserID);
+                //LoadEmployees();
+        
+              }
+              GenerateApps();
+              GetLandingPageURL();
+              lnkMobLandingPageURL.HRef = LandingPageURL;
+              lnkLandingPageURL.HRef = LandingPageURL;
+            }
+          }
+          catch (Exception ex)
+          {
+            LogError(ex.Message, ex.ToString());
+            //throw;
+          }
+        }</pre></code>
+    
+  </div>
+</div>
+
+<h1>Add the below line BIApplication.Master.cs</h1>
+<h4>Page_Init</h4>
+<div class="card">
+  <div class="card-body">
+    <code><pre>if (Request.IsAuthenticated)</pre></code>
+  </div>
+</div>
+<h4>For example:</h4>
+<div class="card">
+  <div class="card-body">
+    <code><pre>protected void Page_Load(object sender, EventArgs e)
+      {
+          try
+          {
+              if (Request.IsAuthenticated) {
+              
+                  if (Path.GetFileName(Request.PhysicalPath).Equals("Profile.aspx"))
+                  {
+                      lnkAppMenu.Attributes.Add("data-step", "-2");
+                      lnkAppMenu.Attributes.Add("data-position", "bottom");
+                      lnkAppMenu.Attributes.Add("data-intro", "Click to open application menu");
+      
+                      lnkPortalLandingPage.Attributes.Add("data-step", "-1");
+                      lnkPortalLandingPage.Attributes.Add("data-position", "bottom");
+                      lnkPortalLandingPage.Attributes.Add("data-intro", "Click to go to portal home");
+      
+                      lnkHome.Attributes.Add("data-step", "0");
+                      lnkHome.Attributes.Add("data-position", "bottom");
+                      lnkHome.Attributes.Add("data-intro", "Click to go to application home");
+                  }
+      
+      
+                  ApplicationManagement applicationManagement = new ApplicationManagement();
+                  Authorization authorization = new Authorization();
+                  authorization.UserID = this.Master.UserID;
+                  DataTable dtMenuList = GenerateMenus();
+      
+                  DataSet dsNotification = authorization.SelectNotificationDetails();
+                  rlvNotification.DataSource = dsNotification.Tables[1];
+                  rlvNotification.DataBind();
+      
+                  NotificationTimeStamp = authorization.NotificationTimeStamp;
+                  if (dsNotification.Tables[0].Rows[0][0].ToString().Equals("0"))
+                  {
+                      lblNotificationCount.Visible = false;
+                      lblNotificationBadge.Visible = false;
+                      lnkNotification.Attributes.Add("onmouseover", "UpdateNotificationViewStatus()");
+                  }
+                  else
+                  {
+                      lblNotificationCount.Text = string.Format("<h5>{0}</h5>", dsNotification.Tables[0].Rows[0][0].ToString());
+                      lblNotificationBadge.Visible = true;
+                      lblNotificationCount.Visible = true;
+                      lnkNotification.Attributes.Add("onmouseover", "UpdateNotificationViewStatus()");
+                  }
+      
+      
+                  this.Master.GetLandingPageURL();
+                  lnkPortalLandingPage.HRef = this.Master.LandingPageURL;
+      
+                  //if (Path.GetFileName(Request.PhysicalPath).Equals("VendorMasterApprovalProcess.aspx"))
+                  //{
+                  //    lnkHome.CssClass = "breadcrumbbutton active";
+                  //}
+                  //else
+                  //{
+                  //    lnkHome.CssClass = "breadcrumbbutton";
+                  //}
+      
+                  if (UserID.Equals("68205") || UserID.Equals("14510") || UserID.Equals("23051"))
+                      pnlAdmin.Visible = true;
+                  else
+                      pnlAdmin.Visible = false;
+              }
+          }
+          catch (Exception ex)
+          {
+              this.Master.LogError(ex.Message, ex.ToString());
+          }
+      }</pre></code>
+  </div>
+</div>
+
+<h1>In web.config Add this code</h1>
+<div class="card">
+  <div class="card-body">
+    <h4>Replace your ClientId and TenentId:</h4>
+    <code><pre>
+&lt;appSettings&gt;
+      &lt;add key="ida:ClientId" value="778216de-c91c-4b87-8bed-704e8a3f35e3"/&gt;
+      &lt;add key="ida:AADInstance" value="https://login.microsoftonline.com/"/&gt;
+      &lt;add key="ida:Domain" value="brakesindiaprivatelimited.onmicrosoft.com"/&gt;
+      &lt;add key="ida:TenantId" value="2d9b99fb-2894-41aa-b14e-c12bfb2c53b8"/&gt;
+      &lt;add key="ida:PostLogoutRedirectUri" value="./signout-oidc"/&gt;
+&lt;/appSettings&gt;
+
+
+&lt;system.webServer&gt;
+  &lt;defaultDocument enabled="true"/&gt;
+  &lt;directoryBrowse enabled="true"/&gt;
+  &lt;modules runAllManagedModulesForAllRequests="true"/&gt;
+  &lt;validation validateIntegratedModeConfiguration="false"/&gt;
+&lt;/system.webServer&gt;
+
+&lt;system.web&gt;
+  &lt;authentication mode="None"/&gt;
+&lt;/system.web&gt;
+    </pre></code>
+  </div>
+</div>
+
+
+
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>
