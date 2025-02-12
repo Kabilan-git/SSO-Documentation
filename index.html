@@ -243,7 +243,7 @@
               objAuthorization.Browser = Request.Browser.Id + " - " + Request.Browser.Version;
               // Client Operating System
               objAuthorization.PlatForm = Request.Browser.Platform;
-              if (!path.Equals("Default.aspx") && !path.Equals("Notifications.aspx") && !path.Equals("CheckAuthenticate.aspx") && !objAuthorization.ValidateFunctionalityAuthorizationForUser())
+              if (!path.Equals("Default.aspx") && !path.Equals("Notifications.aspx") && !objAuthorization.ValidateFunctionalityAuthorizationForUser())
                 Response.Redirect("~/Error.aspx", false);
               else
                 objAuthorization.LogUserDetailsInDB();
