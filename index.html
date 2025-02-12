@@ -101,7 +101,7 @@
                 {
                   public object Build(Type returnType) => null;
                   public IAppBuilder New() => new AppBuilder();
-                  public IDictionary<string, object> Properties => new Dictionary<string, object>();
+                  public IDictionary&lt;string, object&gt; Properties => new Dictionary&lt;string, object&gt;();
                   public IAppBuilder Use(object middleware, params object[] args) => this;
                 }
               }
