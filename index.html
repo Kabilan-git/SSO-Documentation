@@ -153,6 +153,9 @@
 
 <div class="card">
   <div class="card-body">
+    <p>Add the below line in Global Declaration</p>
+    <code><pre>public string OriginalUserId { get { return Session["OriginalUserID"] != null ? Session["OriginalUserID"].ToString() : string.Empty; } }</pre></code>
+    
     <code><pre>protected void Page_Init(object sender, EventArgs e)
       {
         try
@@ -167,9 +170,12 @@
             var surname = claimsPrincipal.FindFirst(ClaimTypes.Surname)?.Value;
             var givenName = claimsPrincipal.FindFirst(ClaimTypes.GivenName)?.Value;	
             userName = $"{surname} {givenName}";
-            Session["UserID"] = mail.Split('@')[0];//"69904";//12186";//"68205";//12186;//51075;
-            Session["UserName"] = userName;//"Meganathan K";
-            Session["LoginName"] = userName;//"Meganathan K";
+            if (OriginalUserId == string.Empty) 
+            {
+				        Session["UserID"] = mail.Split('@')[0];//"69904";//12186";//"68205";//12186;//51075;
+				        Session["UserName"] = userName;//"Meganathan K";
+				        Session["LoginName"] = userName;//"Meganathan K";
+            }           
             IsAuthenticated = true;
           }
           if (HttpContext.Current.User.Identity.IsAuthenticated)
