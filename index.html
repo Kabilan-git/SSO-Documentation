@@ -133,7 +133,7 @@
         if (!Request.IsAuthenticated)
         {
           HttpContext.Current.GetOwinContext().Authentication.Challenge(
-          new AuthenticationProperties { RedirectUri = "/" },
+          new AuthenticationProperties { RedirectUri = ConfigurationManager.AppSettings["AuthenticationURL"].ToString()},
           OpenIdConnectAuthenticationDefaults.AuthenticationType);
         }
         else
