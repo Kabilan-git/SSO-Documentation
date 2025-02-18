@@ -157,139 +157,141 @@
     <code><pre>public string OriginalUserId { get { return Session["OriginalUserID"] != null ? Session["OriginalUserID"].ToString() : string.Empty; } }</pre></code>
     
     <code><pre>protected void Page_Init(object sender, EventArgs e)
-      {
-        try
         {
-          var path = Path.GetFileName(Request.PhysicalPath);
-          bool IsAuthenticated = false;
-          string mail = string.Empty, userName = string.Empty;
-          if (HttpContext.Current.User.Identity.IsAuthenticated)
-          {
-            mail = HttpContext.Current.User.Identity.Name;
-            var claimsPrincipal = HttpContext.Current.User as ClaimsPrincipal;
-            var surname = claimsPrincipal.FindFirst(ClaimTypes.Surname)?.Value;
-            var givenName = claimsPrincipal.FindFirst(ClaimTypes.GivenName)?.Value;	
-            userName = $"{surname} {givenName}";
-            if (OriginalUserId == string.Empty) 
+            try
             {
-				        Session["UserID"] = mail.Split('@')[0];//"69904";//12186";//"68205";//12186;//51075;
-				        Session["UserName"] = userName;//"Meganathan K";
-				        Session["LoginName"] = userName;//"Meganathan K";
-            }           
-            IsAuthenticated = true;
-          }
-          if (HttpContext.Current.User.Identity.IsAuthenticated)
-            IsAuthenticated = true;
-          else if (Session["UserID"] == null || Session["UserName"] == null || Session["LoginName"] == null) // Validating Session Values
-            IsAuthenticated = false;
-      
-          if (!IsAuthenticated)
-          {
-            int number;
-            string userid = mail.Split('@')[0];
-            bool success = Int32.TryParse(userid, out number);
-            string LoggedInUser = string.Empty;
-            if (success)
-            {
-              LoggedInUser = userid;
-            }
-            else
-            {
-              BICommon objBICommon = new BICommon();
-              DataSet _dsGetSpecialEmployeeByUserid = objBICommon.SelectSpecialEmployeeNoByUserId(userid);
-              if (_dsGetSpecialEmployeeByUserid.Tables[0].Rows.Count > 0)
-              {
-                LoggedInUser = _dsGetSpecialEmployeeByUserid.Tables[0].Rows[0]["EmpNo"].ToString();
-              }
-              else
-              {
-                string email = mail;
-                DataSet dsSpecialEmployeeNo = objBICommon.SelectSpecialEmployeeNo(email);
-                if (email != "" && email != null)
+                var path = Path.GetFileName(Request.PhysicalPath);
+                bool IsAuthenticated = false;
+                string mail = string.Empty, userName = string.Empty, emailid = string.Empty;
+                if (HttpContext.Current.User.Identity.IsAuthenticated)
                 {
-                  if (dsSpecialEmployeeNo.Tables.Count > 0)
-                  {
-                    if (dsSpecialEmployeeNo.Tables[0].Rows.Count > 0)
+                    mail = HttpContext.Current.User.Identity.Name;                    
+                    var claimsPrincipal = HttpContext.Current.User as ClaimsPrincipal;
+                    var surname = claimsPrincipal.FindFirst(ClaimTypes.Surname)?.Value;
+                    var givenName = claimsPrincipal.FindFirst(ClaimTypes.GivenName)?.Value;
+                    emailid = claimsPrincipal.FindFirst(ClaimTypes.Email)?.Value; // Added for non numeric mail id's
+ 
+                    userName = $"{surname} {givenName}";
+                    if (OriginalUserId == string.Empty)
                     {
-                      LoggedInUser = dsSpecialEmployeeNo.Tables[0].Rows[0]["pernr"].ToString();
+                        Session["UserID"] = mail.Split('@')[0];
+                        Session["UserName"] = userName;
+                        Session["LoginName"] = userName;
                     }
-                  }
+                    IsAuthenticated = true;
                 }
-              }
+                if (HttpContext.Current.User.Identity.IsAuthenticated)
+                    IsAuthenticated = true;
+                else if (Session["UserID"] == null || Session["UserName"] == null || Session["LoginName"] == null) // Validating Session Values
+                    IsAuthenticated = false;
+ 
+                if (IsAuthenticated)
+                {
+                    int number;
+                    string userid = mail.Split('@')[0];
+                    bool success = Int32.TryParse(userid, out number);
+                    string LoggedInUser = string.Empty;
+                    if (success)
+                    {
+                        LoggedInUser = userid;
+                    }
+                    else
+                    {
+                        BICommon objBICommon = new BICommon();
+                        DataSet _dsGetSpecialEmployeeByUserid = objBICommon.SelectSpecialEmployeeNoByUserId(emailid.Replace('@','_'));
+                        if (_dsGetSpecialEmployeeByUserid.Tables[0].Rows.Count > 0)
+                        {
+                            LoggedInUser = _dsGetSpecialEmployeeByUserid.Tables[0].Rows[0]["EmpNo"].ToString();
+                        }
+                        else
+                        {
+                            string email = emailid;
+                            DataSet dsSpecialEmployeeNo = objBICommon.SelectSpecialEmployeeNo(email);
+                            if (email != "" && email != null)
+                            {
+                                if (dsSpecialEmployeeNo.Tables.Count > 0)
+                                {
+                                    if (dsSpecialEmployeeNo.Tables[0].Rows.Count > 0)
+                                    {
+                                        LoggedInUser = dsSpecialEmployeeNo.Tables[0].Rows[0]["pernr"].ToString();
+                                    }
+                                }
+                            }
+                        }
+                    }
+ 
+                    if (!LoggedInUser.Equals(string.Empty))
+                    {
+                        Session["UserID"] = LoggedInUser;
+                        Session["UserName"] = userName;
+                        Session["LoginName"] = userName;
+                        // Creating User Details For Cookie Store
+                        string UserDetails = string.Format("{0}|{1}|{2}", objAuthorization.UserID, userName, mail);
+                        // Create the cookie that contains the forms authentication ticket
+                        HttpCookie authCookie = FormsAuthentication.GetAuthCookie(objAuthorization.UserID, false);
+                        // Get the FormsAuthenticationTicket out of the encrypted cookie
+                        FormsAuthenticationTicket ticket = FormsAuthentication.Decrypt(authCookie.Value);
+                        // Create a new FormsAuthenticationTicket that includes our custom User Data
+                        FormsAuthenticationTicket newTicket = new FormsAuthenticationTicket(ticket.Version, ticket.Name, ticket.IssueDate, ticket.Expiration, ticket.IsPersistent, UserDetails);
+                        // Update the authCookie's Value to use the encrypted version of newTicket
+                        authCookie.Value = FormsAuthentication.Encrypt(newTicket);
+                        // Manually add the authCookie to the Cookies collection
+                        Response.Cookies.Add(authCookie);
+ 
+                        objAuthorization.SessionID = Session.SessionID;
+                        // Logged In User ID
+                        objAuthorization.UserID = Session["UserID"].ToString();
+                        // Current Page Name
+                        objAuthorization.PageName = Path.GetFileName(Request.PhysicalPath);
+                        // Application ID
+                        objAuthorization.ApplicationID = ApplicationName;
+                        // Remote Host ID
+                        objAuthorization.RemoteHost = Request.UserHostAddress;
+                        // Client Browser Version
+                        objAuthorization.Browser = Request.Browser.Id + " - " + Request.Browser.Version;
+                        // Client Operating System
+                        objAuthorization.PlatForm = Request.Browser.Platform;
+                        if (!path.Equals("Default.aspx") && !path.Equals("Notifications.aspx") && !objAuthorization.ValidateFunctionalityAuthorizationForUser())
+                            Response.Redirect("~/Error.aspx", false);
+                        else
+                            objAuthorization.LogUserDetailsInDB();
+                    }
+                    //else
+                    //{
+                    //    Response.Redirect("~/Error.aspx", false);
+                    //}
+                    //else
+                    //{
+                    //	// Development debug mode commented this while go to live it will be uncomment
+                    //	//Response.Redirect("~/Error.aspx", false);
+                    //}
+                }
+                else
+                {
+                    objAuthorization.SessionID = Session.SessionID;
+                    // Logged In User ID
+                    objAuthorization.UserID = Session["UserID"].ToString();
+                    // Current Page Name
+                    objAuthorization.PageName = Path.GetFileName(Request.PhysicalPath);
+                    // Application ID
+                    objAuthorization.ApplicationID = ApplicationName;
+                    // Remote Host ID
+                    objAuthorization.RemoteHost = Request.UserHostAddress;
+                    // Client Browser Version
+                    objAuthorization.Browser = Request.Browser.Id + " - " + Request.Browser.Version;
+                    // Client Operating System
+                    objAuthorization.PlatForm = Request.Browser.Platform;
+                    if (!path.Equals("Default.aspx") && !path.Equals("Notifications.aspx") && !objAuthorization.ValidateFunctionalityAuthorizationForUser())
+                        Response.Redirect("~/Error.aspx", false);
+                    else
+                        objAuthorization.LogUserDetailsInDB();
+                }
             }
-      
-            if (!LoggedInUser.Equals(string.Empty))
+            catch (Exception ex)
             {
-              Session["UserID"] = LoggedInUser;
-              Session["UserName"] = userName; 
-              Session["LoginName"] = userName; 
-              // Creating User Details For Cookie Store
-              string UserDetails = string.Format("{0}|{1}|{2}", objAuthorization.UserID, userName, mail);
-              // Create the cookie that contains the forms authentication ticket
-              HttpCookie authCookie = FormsAuthentication.GetAuthCookie(objAuthorization.UserID, false);
-              // Get the FormsAuthenticationTicket out of the encrypted cookie
-              FormsAuthenticationTicket ticket = FormsAuthentication.Decrypt(authCookie.Value);
-              // Create a new FormsAuthenticationTicket that includes our custom User Data
-              FormsAuthenticationTicket newTicket = new FormsAuthenticationTicket(ticket.Version, ticket.Name, ticket.IssueDate, ticket.Expiration, ticket.IsPersistent, UserDetails);
-              // Update the authCookie's Value to use the encrypted version of newTicket
-              authCookie.Value = FormsAuthentication.Encrypt(newTicket);
-              // Manually add the authCookie to the Cookies collection
-              Response.Cookies.Add(authCookie);
-      
-              objAuthorization.SessionID = Session.SessionID;
-              // Logged In User ID
-              objAuthorization.UserID = Session["UserID"].ToString();
-              // Current Page Name
-              objAuthorization.PageName = Path.GetFileName(Request.PhysicalPath);
-              // Application ID
-              objAuthorization.ApplicationID = ApplicationName;
-              // Remote Host ID
-              objAuthorization.RemoteHost = Request.UserHostAddress;
-              // Client Browser Version
-              objAuthorization.Browser = Request.Browser.Id + " - " + Request.Browser.Version;
-              // Client Operating System
-              objAuthorization.PlatForm = Request.Browser.Platform;
-              if (!path.Equals("Default.aspx") && !path.Equals("Notifications.aspx") && !objAuthorization.ValidateFunctionalityAuthorizationForUser())
-                Response.Redirect("~/Error.aspx", false);
-              else
-                objAuthorization.LogUserDetailsInDB();
+                throw ex;
             }
-            else
-            {
-                Response.Redirect("~/Error.aspx", false);
-            }
-            //else
-            //{
-            //	// Development debug mode commented this while go to live it will be uncomment
-            //	//Response.Redirect("~/Error.aspx", false);
-            //}
-          }
-          else
-          {
-            objAuthorization.SessionID = Session.SessionID;
-            // Logged In User ID
-            objAuthorization.UserID = Session["UserID"].ToString();
-            // Current Page Name
-            objAuthorization.PageName = Path.GetFileName(Request.PhysicalPath);
-            // Application ID
-            objAuthorization.ApplicationID = ApplicationName;
-            // Remote Host ID
-            objAuthorization.RemoteHost = Request.UserHostAddress;
-            // Client Browser Version
-            objAuthorization.Browser = Request.Browser.Id + " - " + Request.Browser.Version;
-            // Client Operating System
-            objAuthorization.PlatForm = Request.Browser.Platform;
-            if (!path.Equals("Default.aspx") && !path.Equals("Notifications.aspx") && !path.Equals("CheckAuthenticate.aspx") && !objAuthorization.ValidateFunctionalityAuthorizationForUser())
-              Response.Redirect("~/Error.aspx", false);
-            else
-              objAuthorization.LogUserDetailsInDB();
-          }
-        }
-        catch (Exception ex)
-        {
-          throw ex;
-        }
-      }</pre></code>
+        }</pre></code>
   </div>
 </div>
 <h4>Page_Load</h4>
