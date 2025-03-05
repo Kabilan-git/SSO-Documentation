@@ -185,7 +185,7 @@
                 else if (Session["UserID"] == null || Session["UserName"] == null || Session["LoginName"] == null) // Validating Session Values
                     IsAuthenticated = false;
  
-                if (IsAuthenticated)
+                if (!IsAuthenticated)
                 {
                     int number;
                     string userid = mail.Split('@')[0];
